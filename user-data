@@ -65,6 +65,7 @@ zypper:
 
 package_update: true
 package_upgrade: true
+package_reboot_if_required: true
 packages:
   - obs-api
   - obs-server
@@ -78,5 +79,61 @@ write_files:
     content: |
       [solver]
       installRecommends = no
+  - path: /root/my.defaults
+    owner: root:root
+    permissions: '0700'
+    content: |
+      [mysql]
+      user = root
+      password = ''
+  - path: /srv/www/obs/api/config/database.yml
+    owner: root:www
+    permissions: '0640'
+    content: |
+      production:
+        adapter: mysql2
+        database: api_production
+        username: obs
+        password: skytree
+        encoding: utf8
+        timeout: 15
+        pool: 30
+  - path: /root/db_init.sh
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/bash
+      set -eu
+      
+      mysql --defaults-file=/root/my.defaults <<< "
+      UPDATE mysql.user SET Password='*973004CBB77C6F6BA1BF66B1C47DD02CC91A167D' WHERE User='root';
+      DELETE FROM mysql.user WHERE User='';
+      DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1');
+      DROP DATABASE IF EXISTS test;
+      DELETE FROM mysql.db WHERE Db='test' OR Db='test_%';
+      CREATE DATABASE api_production;
+      CREATE USER 'obs'@'%';
+      CREATE USER 'obs'@'localhost';
+      UPDATE mysql.user SET Password='*973004CBB77C6F6BA1BF66B1C47DD02CC91A167D' WHERE User='obs';
+      GRANT all privileges ON api_production.* TO 'obs'@'%';
+      GRANT all privileges ON api_production.* TO 'obs'@'localhost';
+      FLUSH PRIVILEGES;
+      "
+  - path: /root/db_populate.sh
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/bash
+      set -eu
+      cd /srv/www/obs/api
+      RAILS_ENV="production" rake db:setup writeconfiguration ts:index ts:start
+
+runcmd:
+  - [ systemctl, start, obsrepserver ]
+  - [ systemctl, start, obssrcserver ]
+  - [ systemctl, start, mysql ]
+  - [ /root/db_init.sh ]
+  - [ /root/db_populate.sh ]
+  - [ rm, -f, /root/my.defaults, /root/db_init.sh, /root/db_populate.sh ]
 
 final_message: "---- cloud-init finished ----"
