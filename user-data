@@ -71,6 +71,10 @@ packages:
   - obs-server
   - obs-service-tar-git
   - obs-worker
+  - apache2
+  - apache2-mod_xforward
+  - rubygem-passenger-apache2
+  - memcached
 
 write_files:
   - path: /etc/zypp/zypper.conf
@@ -127,6 +131,31 @@ write_files:
       set -eu
       cd /srv/www/obs/api
       RAILS_ENV="production" rake db:setup writeconfiguration ts:index ts:start
+  - path: /root/apache_config.sh
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/bash
+      set -eu
+      
+      appendval()
+      {
+          f="/etc/sysconfig/apache2"
+          sed -rn 's@^\s*'"${1}"'\s*=\s*"([^"]*)"\s*$@\1@ p' "${f}" |
+              egrep '(^| )'"${2}"'($| )' &&
+                  return
+          sed -ri 's@^\s*('"${1}"'\s*=\s*"[^"]*)"\s*$@\1 '"${2}"'"@' "${f}"
+      }
+      
+      appendval APACHE_MODULES passenger
+      appendval APACHE_MODULES rewrite
+      appendval APACHE_MODULES proxy
+      appendval APACHE_MODULES proxy_http
+      appendval APACHE_MODULES xforward
+      appendval APACHE_MODULES headers
+      appendval APACHE_MODULES socache_shmcb
+      
+      appendval APACHE_SERVER_FLAGS SSL
 
 runcmd:
   - [ systemctl, start, obsrepserver ]
@@ -135,5 +164,10 @@ runcmd:
   - [ /root/db_init.sh ]
   - [ /root/db_populate.sh ]
   - [ rm, -f, /root/my.defaults, /root/db_init.sh, /root/db_populate.sh ]
+  - [ /root/apache_config.sh ]
+  - [ rm, -f, /root/apache_config.sh ]
+  - [ systemctl, start, apache2 ]
+  - [ systemctl, start, obsapidelayed ]
+  - [ systemctl, start, memcached ]
 
 final_message: "---- cloud-init finished ----"
