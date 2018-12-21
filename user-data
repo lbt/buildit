@@ -178,6 +178,30 @@ write_files:
       
       cp "${pem}" "${certs}"
       c_rehash "${certs}"
+  - path: /root/services.sh
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/bash
+      set -eu
+      
+      S=(
+          obsrepserver
+          obssrcserver
+          mysql
+          obsscheduler
+          obsdispatcher
+          obspublisher
+          obsservice
+          memcached
+          apache2
+          obsapidelayed
+          obswarden
+          obsworker
+      )
+      systemctl enable "${S[@]}"
+      systemctl stop "${S[@]}"
+      systemctl start "${S[@]}"
 
 runcmd:
   - [ systemctl, start, obsrepserver ]
@@ -190,8 +214,7 @@ runcmd:
   - [ rm, -f, /root/apache_config.sh ]
   - [ /root/cert_setup.sh ]
   - [ rm, -f, /root/cert_setup.sh ]
-  - [ systemctl, start, apache2 ]
-  - [ systemctl, start, obsapidelayed ]
-  - [ systemctl, start, memcached ]
+  - [ /root/services.sh ]
+  - [ rm, -f, /root/services.sh ]
 
 final_message: "---- cloud-init finished ----"
