@@ -199,9 +199,16 @@ write_files:
           obswarden
           obsworker
       )
-      systemctl enable "${S[@]}"
-      systemctl stop "${S[@]}"
-      systemctl start "${S[@]}"
+      while test "${1}" = "-s"
+      do
+          shift
+          S+=( "${1}" )
+          shift
+      done
+      for action in "${@}"
+      do
+          systemctl ${action} "${S[@]}"
+      done
   - path: /root/fixup.sh
     owner: root:root
     permissions: '0700'
@@ -241,6 +248,49 @@ write_files:
       zypper in -y --oldpackage apache2-2.4.16-7.1.x86_64 apache2-prefork-2.4.16-7.1.x86_64
       systemctl restart apache2
 
+  - path: /root/update.sh
+    owner: root:root
+    permissions: '0700'
+    content: |
+      #!/bin/bash
+      set -eu
+      
+      dump="http://192.168.1.34/api_production.2018-12-28.sql.gz"
+      svc="$( readlink -e "$( dirname "$( readlink -e "${0}" )" )/services.sh" )"
+      
+      "${svc}" stop
+      
+      zypper rr obs_server_mer-2.5_42.1
+      zypper ar -p 49 -G http://repo.merproject.org/obs/obs:/server:/2.9:/mer/openSUSE_42.3/ obs_server_mer_2.9_42.3
+      zypper ref
+      rpm -qa | sort -u > /tmp/ci-preupdate_rpm-qa.txt
+      zypper dup -y --no-recommends --details
+      rpm -qa | sort -u > /tmp/ci-postupdate_rpm-qa.txt
+      
+      systemctl start mysql
+      
+      if
+          curl "${dump}" | zcat > dump.sql
+      then
+          mysql -u root -p'skytree' api_production < dump.sql
+          rm -f dump.sql
+      else
+          echo "Could not get DB dump, ignoring."
+      fi
+      
+      rm /srv/www/obs/api/db/migrate/20181030161701_add_package_column_to_flags_table.rb
+      rm /srv/www/obs/api/db/migrate/20141002130129_new_suse_bugzillas.rb
+      cd /srv/www/obs/api/
+      RAILS_ENV="production" rails.ruby2.5 db:migrate:with_data
+      
+      chown -R wwwrun.www /srv/www/obs/api/log
+      chown -R wwwrun.www /srv/www/obs/api/tmp
+      sed -ri '
+          s@^(\s*PassengerRuby\s+"/usr/bin/ruby)(".*)$@\1.ruby2.5\2@
+        ' /etc/apache2/conf.d/mod_passenger.conf
+      
+      "${svc}" -s obsservicedispatch enable start
+
 runcmd:
   - [ systemctl, start, obsrepserver ]
   - [ systemctl, start, obssrcserver ]
@@ -254,7 +304,8 @@ runcmd:
   - [ rm, -f, /root/cert_setup.sh ]
   - [ /root/fixup.sh ]
   - [ rm, -f, /root/fixup.sh ]
-  - [ /root/services.sh ]
-  - [ rm, -f, /root/services.sh ]
+  - [ /root/services.sh, enable, start ]
+  - [ /root/update.sh ]
+  - [ rm, -f, /root/update.sh, /root/services.sh ]
 
 final_message: "---- cloud-init finished ----"
