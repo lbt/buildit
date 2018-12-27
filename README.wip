@@ -1,0 +1,7 @@
+0. Install kvm kit, thin-provisioning-tools
+1. Set up a VM with leap 42.3 or some other suitable distro, to act as a kiwi runner
+2. Set up a logical volume, "ci-root", of 5GB or more and expose it to kiwirunner VM (virt, raw-backed vmdk etc)
+3. Check that TARGET in rebuild-ci-root.sh makes sense in the kiwirunner VM
+4. Run rebuild-ci-root.sh in the kiwirunner VM (and power it off if virtualbox)
+5. Check that VG in buildit.sh makes sense
+6. Run buildit.sh
