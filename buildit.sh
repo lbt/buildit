@@ -39,6 +39,7 @@ function fixup_snapshot() {
     echo "*** Fixing up snapshot ***"
     cat <<EOF > /mnt/etc/fstab
 /dev/vda        /       ext4    rw,noatime,user_xattr,acl,barrier=1,data=ordered        0       1
+hostshare       /host   9p      trans=virtio                                            0       0
 EOF
     chroot /mnt systemctl enable cloud-init.service
     chroot /mnt systemctl enable cloud-config.service
@@ -95,6 +96,7 @@ function create_vm() {
          --disk path=/dev/${VG}/${VM}-root-snap,bus=virtio,cache=none,format=raw --import \
          --disk path=/dev/${VG}/${VM}-swap,bus=virtio,cache=none,format=raw \
          --disk path=/dev/${VG}/${VM}-data,bus=virtio,cache=none,format=raw \
+         --filesystem ${PWD}/share,hostshare \
          --graphics none \
          --disk path=./${VM}_config.iso,device=cdrom\
          --boot kernel=/kvmboot/${VM}/vmlinuz-4.4.165-81-default,initrd=/kvmboot/${VM}/initrd-4.4.165-81-default,kernel_args="root=/dev/vda console=ttyS0" || exit 1
