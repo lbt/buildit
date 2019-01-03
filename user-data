@@ -284,6 +284,14 @@ write_files:
       rpm -qa | sort -u > /tmp/ci-preupdate_rpm-qa.txt
       zypper dup -y --no-recommends --details
       rpm -qa | sort -u > /tmp/ci-postupdate_rpm-qa.txt
+
+      if
+          test -r /host/open-build-service
+      then
+        echo "Syncing OBS code from git"
+        rsync -acv --exclude=tmp --exclude=spec --exclude=log --exclude=config /host/open-build-service/src/api/ /srv/www/obs/api/
+        rsync -acv /host/open-build-service/src/backend/ /usr/lib/obs/server
+      fi
       
       rm /srv/www/obs/api/db/migrate/20181030161701_add_package_column_to_flags_table.rb
       rm /srv/www/obs/api/db/migrate/20141002130129_new_suse_bugzillas.rb
