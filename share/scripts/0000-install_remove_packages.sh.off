@@ -1,0 +1,82 @@
+#!/bin/bash
+set -eu
+
+in_prerm=(
+    bash-completion
+    cloud-init
+    cloud-init-config-suse
+    curl
+    emacs-nox
+    iptables
+    iputils
+    less
+    openssh
+    puppet
+    rsync
+    sudo
+    terminfo
+    wget
+    wicked
+)
+
+rm=(
+    gfxboot
+    gfxboot-branding-openSUSE
+    grub2
+    grub2-branding-openSUSE
+    lvm2
+    plymouth
+    plymouth-branding-openSUSE
+    rpcbind
+    ruby2.1
+)
+
+
+in_postrm=(
+    ca-certificates-mozilla
+    obs-api
+    obs-server
+    obs-service-tar-git
+    obs-worker
+    apache2
+    apache2-mod_xforward
+    rubygem-passenger-apache2
+    memcached
+)
+
+cat <<EOF > /etc/zypp/repos.d/obs_server_mer-2.5_42.1.repo
+[Mer OBS 2.5 on 42.1 (openSUSE_42.3)]
+type=rpm-md
+baseurl=http://repo.merproject.org/obs/obs:/server:/mer-2.5:/42.1/openSUSE_42.3/
+gpgcheck=0
+enabled=1
+autorefresh=1
+priority=69
+EOF
+
+cat <<EOF > /etc/zypp/repos.d/MINT.repo
+[MINT (openSUSE_42.3)]
+baseurl=http://repo.merproject.org/obs/mint/openSUSE_42.3/
+enabled=1
+gpgcheck=0
+autorefresh=1
+type=rpm-md
+priority=69
+EOF
+
+cat <<EOF > /etc/zypp/repos.d/mer-infra_stable.repo
+[Mer Infra stable (openSUSE_42.3)]
+baseurl=http://repo.merproject.org/obs/mer-infra:/stable/openSUSE_42.3/
+enabled=1
+gpgcheck=0
+autorefresh=1
+type=rpm-md
+priority=69
+EOF
+
+zypper ref
+zypper dup -y --no-recommends
+
+zypper in -y --no-recommends "${in_prerm[@]}"
+zypper rm -y "${rm[@]}" || :
+zypper in -y --no-recommends "${in_postrm[@]}"
